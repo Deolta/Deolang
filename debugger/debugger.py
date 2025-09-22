@@ -6,6 +6,7 @@ import warnings
 
 import numpy as np
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
                              QLineEdit, QSpinBox, QHBoxLayout, QVBoxLayout,
                              QLabel, QGroupBox, QPushButton, QListWidget, QSizePolicy, QAction, QFileDialog)
@@ -37,7 +38,7 @@ TURN_LEFT = {
 class GridMap:
     def __init__(self, file=None):
         if not file or not os.path.exists(file):
-            raise FileNotFoundError("Файл не найден или не указан")
+            raise FileNotFoundError("File not found or not specified")
 
         grid = []
         temp = []
@@ -60,18 +61,18 @@ class GridMap:
 
         row_length = len(grid[0])
         if not all(len(row) == row_length for row in grid):
-            raise ValueError(f"Все строки должны быть одинаковой длины {row_length}")
+            raise ValueError(f"All rows must be the same length: {row_length}")
 
         self._map = np.array(grid, dtype=str)
         if self._map.size == 0:
-            raise ValueError("Карта не может быть пустой")
+            raise ValueError("Map is can't be empty")
 
     def get_map(self):
         return self._map.copy()
 
     def get_item(self, x: int, y: int) -> str:
         if x < 0 or y < 0 or x >= self._map.shape[1] or y >= self._map.shape[0]:
-            raise IndexError(f"Индекс вне границ: ({x}, {y})")
+            raise IndexError(f"index out of range: ({x}, {y})")
         return self._map[y, x]
 
     def __len__(self):
@@ -94,7 +95,7 @@ class Interpreter:
             self.built_in_input = True
 
     def run(self) -> None:
-        raise NotImplementedError("Метод временно не реализован")
+        raise NotImplementedError("Method not implemented")
 
     def get_output(self):
         return "".join(self.output)
@@ -122,6 +123,8 @@ class Interpreter:
     def process_char(self, char: str):
         if char in DIRECTIONS:
             self.direction = DIRECTIONS[char]
+        elif char == "" or char is None:
+            return False
         elif char.isdigit():
             self.stack.append(int(char))
         elif char == "+":
@@ -156,7 +159,7 @@ class Interpreter:
             if self.built_in_input:
                 _input = input("Input: ")
                 if not _input:
-                    raise ValueError("Нет ввода")
+                    raise ValueError("No input provided")
                 for input_char in _input:
                     self.stack.append(ord(input_char))
                 self.stack.append(0)
@@ -164,15 +167,13 @@ class Interpreter:
                 self.stack.append(ord(self.input[self.input_pointer]))
                 self.input_pointer += 1
         elif char in "|_":
-            raise NotImplementedError(f"Инструкция {char} не реализована")
+            raise NotImplementedError(f"Instruction not implemented: {char}")
         elif char == "/":
             val = self.stack.pop()
             self.direction = TURN_LEFT[self.direction] if val == 0 else TURN_RIGHT[self.direction]
         elif char == "\\":
             val = self.stack.pop()
             self.direction = TURN_RIGHT[self.direction] if val == 0 else TURN_LEFT[self.direction]
-        elif char == "" or char is None:
-            return False
 
         self.x += self.direction[0]
         self.y += self.direction[1]
@@ -279,7 +280,7 @@ class CellGrid(QWidget):
         self.highlight_col = col
         self.update_highlights()
 
-    def get_sell_data(self):
+    def get_cell_data(self):
         return self.cells[self.highlight_row][self.highlight_col].text()
 
     def cell_key_press_event(self, event, row, col):
@@ -337,7 +338,8 @@ class MainWindow(QMainWindow):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle('Symbol Grid with Highlight Control')
+        self.setWindowTitle('Deolang debbugger')
+        self.setWindowIcon(QIcon(QPixmap('icon.png')))
         self.setGeometry(100, 100, 669, 560)
         central_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -346,7 +348,7 @@ class MainWindow(QMainWindow):
         self.file_menu = self.menu_bar.addMenu("File")
 
         self.open_action = QAction("&Open", self)
-        self.open_action.setShortcut("Ctrl+O") # Сочетание клавиш
+        self.open_action.setShortcut("Ctrl+O")  # Сочетание клавиш
         self.open_action.setStatusTip("Open local file")
         self.open_action.triggered.connect(self.on_open)
         self.file_menu.addAction(self.open_action)
@@ -429,7 +431,6 @@ class MainWindow(QMainWindow):
         third_row.addSpacing(10)
         third_row.addWidget(self.step_all_count)
 
-
         fourth_row = QHBoxLayout()
         fourth_row.addWidget(self.reset_button)
         fourth_row.setAlignment(Qt.AlignLeft)
@@ -491,8 +492,7 @@ class MainWindow(QMainWindow):
 
     def step(self):
 
-        char = self.grid.get_sell_data()
-
+        char = self.grid.get_cell_data()
 
         if not char:
             print("No more steps")
@@ -517,7 +517,6 @@ class MainWindow(QMainWindow):
         self.step_all_count.setText("Done!")
         self.timer.stop()
         self.auto_run = False
-
 
     def reset(self):
         self.interpreter.reset()
@@ -579,7 +578,6 @@ class MainWindow(QMainWindow):
                         file.write(line + '\n')
             except Exception as e:
                 print(f"Error exporting file: {e}")
-
 
     def resize_grid(self):
         rows = self.row_spin.value()
