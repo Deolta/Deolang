@@ -28,7 +28,7 @@ TURN_LEFT = {
 class GridMap:
     def __init__(self, file=None):
         if not file or not os.path.exists(file):
-            raise FileNotFoundError("Файл не найден или не указан")
+            raise FileNotFoundError("file not found or not specified")
 
         grid = []
         temp = []
@@ -51,18 +51,18 @@ class GridMap:
 
         row_length = len(grid[0])
         if not all(len(row) == row_length for row in grid):
-            raise ValueError(f"Все строки должны быть одинаковой длины {row_length}")
+            raise ValueError(f"All rows must be of the same length{row_length}")
 
         self._map = np.array(grid, dtype=str)
         if self._map.size == 0:
-            raise ValueError("Карта не может быть пустой")
+            raise ValueError("Map is cannot be empty")
 
     def get_map(self):
         return self._map.copy()
 
     def get_item(self, x: int, y: int) -> str:
         if x < 0 or y < 0 or x >= self._map.shape[1] or y >= self._map.shape[0]:
-            raise IndexError(f"Индекс вне границ: ({x}, {y})")
+            raise IndexError(f"Index out of bounds: ({x}, {y})")
         return self._map[y, x]
 
     def __len__(self):
@@ -94,7 +94,7 @@ class Interpreter:
                     print(self.get_stack())
                     return
             except Exception as e:
-                print(f"Ошибка: {e}")
+                print(f"Error: {e}")
                 return
 
     def get_output(self):
@@ -159,7 +159,7 @@ class Interpreter:
             if self.built_in_input:
                 _input = input("Input: ")
                 if not _input:
-                    raise ValueError("Нет ввода")
+                    raise ValueError("No input provided")
                 for input_char in _input:
                     self.stack.append(ord(input_char))
                 self.stack.append(0)
@@ -167,7 +167,7 @@ class Interpreter:
                 self.stack.append(ord(self.input[self.input_pointer]))
                 self.input_pointer += 1
         elif char in "|_":
-            raise NotImplementedError(f"Инструкция {char} не реализована")
+            raise NotImplementedError(f"Instruction {char} not implemented")
         elif char == "/":
             val = self.stack.pop()
             self.direction = TURN_LEFT[self.direction] if val == 0 else TURN_RIGHT[self.direction]
@@ -179,3 +179,7 @@ class Interpreter:
         self.y += self.direction[1]
 
         return self.get_information()
+
+
+setup = Interpreter("test.txt")
+setup.run()
