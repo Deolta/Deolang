@@ -10,6 +10,7 @@ from PyQt5.QtGui import QIcon, QPixmap
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
                              QLineEdit, QSpinBox, QHBoxLayout, QVBoxLayout,
                              QLabel, QGroupBox, QPushButton, QListWidget, QSizePolicy, QAction, QFileDialog)
+from PyQt5.QtWinExtras import QWinTaskbarButton
 
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -339,7 +340,7 @@ class MainWindow(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle('Deolang debbugger')
-        self.setWindowIcon(QIcon(QPixmap('icon.png')))
+        self.setWindowIcon(QIcon('images/main_debugger_no_dragon_no_baground.ico'))
         self.setGeometry(100, 100, 669, 560)
         central_widget = QWidget()
         main_layout = QHBoxLayout()
@@ -348,7 +349,7 @@ class MainWindow(QMainWindow):
         self.file_menu = self.menu_bar.addMenu("File")
 
         self.open_action = QAction("&Open", self)
-        self.open_action.setShortcut("Ctrl+O")  # Сочетание клавиш
+        self.open_action.setShortcut("Ctrl+O")
         self.open_action.setStatusTip("Open local file")
         self.open_action.triggered.connect(self.on_open)
         self.file_menu.addAction(self.open_action)
@@ -488,7 +489,7 @@ class MainWindow(QMainWindow):
         self.step_count_total = self.step_count.value()
         self.current_step = 0
         self.is_running = True
-        self.timer.start(1000 // self.speed_slider.value())  # Запуск таймера с нужной скоростью
+        self.timer.start(1000 // self.speed_slider.value())
 
     def step(self):
 
@@ -552,10 +553,8 @@ class MainWindow(QMainWindow):
                 grid_map = GridMap(file_name)
                 grid_data = grid_map.get_map()
 
-                # Очистка текущей сетки
                 self.grid.set_grid_size(self.row_spin.value(), self.col_spin.value())
 
-                # Заполнение ячеек данными из файла
                 for row in range(grid_data.shape[0]):
                     for col in range(grid_data.shape[1]):
                         self.grid.cells[row][col].setText(grid_data[row][col])
