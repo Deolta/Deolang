@@ -18,7 +18,7 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 
 class ColorDialog(QDialog):
-    def __init__(self, parent=None, colors = None):
+    def __init__(self, parent=None, colors=None):
         super().__init__(parent)
         self.setWindowTitle("Color input")
         self.setModal(True)
@@ -110,7 +110,7 @@ class CellGrid(QWidget):
             self.cells.append(row_cells)
 
         self.setLayout(grid_layout)
-        self.update_highlights()
+        self.update_highlights(ignore_mode=False)
 
     def set_grid_size(self, rows, cols):
         old_data = []
@@ -151,9 +151,9 @@ class CellGrid(QWidget):
 
             self.cells.append(row_cells)
 
-        self.update_highlights()
+        self.update_highlights(False)
 
-    def update_highlights(self):
+    def update_highlights(self, ignore_mode):
         for r in range(self.rows):
             for c in range(self.cols):
                 self.cells[r][c].setStyleSheet("")
@@ -165,18 +165,22 @@ class CellGrid(QWidget):
 
         if (self.rows > 0 and self.cols > 0 and
                 (self.highlight_row != self.current_row or self.highlight_col != self.current_col)):
-            self.cells[self.highlight_row][self.highlight_col].setStyleSheet(
-                f"background-color: {self.pointer_fill_color}; border: 2px solid {self.pointer_outline_color}")
+            if ignore_mode:
+                self.cells[self.highlight_row][self.highlight_col].setStyleSheet(
+                    f"background-color: #ffffff; border: 2px solid {self.pointer_outline_color}")
+            else:
+                self.cells[self.highlight_row][self.highlight_col].setStyleSheet(
+                    f"background-color: {self.pointer_fill_color}; border: 2px solid {self.pointer_outline_color}")
 
     def set_current_cell(self, row, col):
         self.current_row = row
         self.current_col = col
-        self.update_highlights()
+        self.update_highlights(False)
 
-    def set_highlight_cell(self, row, col):
+    def set_highlight_cell(self, row, col, ignore_mode):
         self.highlight_row = row
         self.highlight_col = col
-        self.update_highlights()
+        self.update_highlights(ignore_mode)
 
     def get_cell_data(self):
         return self.cells[self.highlight_row][self.highlight_col].text()
@@ -184,19 +188,19 @@ class CellGrid(QWidget):
     def cell_key_press_event(self, event, row, col):
         if event.key() == Qt.Key_Up:
             self.current_row = max(0, self.current_row - 1)
-            self.update_highlights()
+            self.update_highlights(False)
             event.accept()
         elif event.key() == Qt.Key_Down:
             self.current_row = min(self.rows - 1, self.current_row + 1)
-            self.update_highlights()
+            self.update_highlights(False)
             event.accept()
         elif event.key() == Qt.Key_Left:
             self.current_col = max(0, self.current_col - 1)
-            self.update_highlights()
+            self.update_highlights(False)
             event.accept()
         elif event.key() == Qt.Key_Right:
             self.current_col = min(self.cols - 1, self.current_col + 1)
-            self.update_highlights()
+            self.update_highlights(False)
             event.accept()
         else:
             QLineEdit.keyPressEvent(self.cells[row][col], event)
@@ -315,6 +319,7 @@ class MainWindow(QMainWindow):
         self.debug_line1 = QLabel("Output: ")
         self.debug_line2 = QLabel("Cords: ")
         self.debug_line3 = QLabel("Direction: ")
+        self.debug_line4 = QLabel("Ignore_mode: ")
 
         first_row = QHBoxLayout()
         first_row.addWidget(self.run_button)
@@ -367,6 +372,7 @@ class MainWindow(QMainWindow):
         debug_layout.addWidget(self.debug_line1)
         debug_layout.addWidget(self.debug_line2)
         debug_layout.addWidget(self.debug_line3)
+        debug_layout.addWidget(self.debug_line4)
 
         stack_layout = QVBoxLayout()
         stack_layout.addLayout(label_layout)
@@ -436,11 +442,14 @@ class MainWindow(QMainWindow):
             for item in reversed(information["addition_stack"]):
                 self.stack2.addItem(str(item))
 
+        self.debug_line4.setText(f"Ignore_mode: {information['ignore_mode']}")
+
         if information["output"]:
             self.debug_line1.setText(f"Output: {information['output']}")
         if information["position"]:
             self.debug_line2.setText(f"Cords: {information['position']}")
-            self.grid.set_highlight_cell(information["position"][1], information["position"][0])
+            self.grid.set_highlight_cell(information["position"][1], information["position"][0],
+                                         information["ignore_mode"])
         if information["direction"]:
             self.debug_line3.setText(f"Direction: {information['direction']}")
 
@@ -482,7 +491,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "export error", f"Error exporting file: {e}")
 
     def open_input_color_dialog(self):
-        dialog = ColorDialog(self, (self.grid.pointer_outline_color,self.grid.pointer_fill_color,self.grid.cursor_outline_color,self.grid.cursor_fill_color))
+        dialog = ColorDialog(self, (
+        self.grid.pointer_outline_color, self.grid.pointer_fill_color, self.grid.cursor_outline_color,
+        self.grid.cursor_fill_color))
         if dialog.exec_() == QDialog.Accepted:
             new_values = dialog.get_values()
             self.update_colors(new_values)
