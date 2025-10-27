@@ -1,30 +1,27 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from deolang.gridmap import GridMap
 from deolang.constants import (TURN_LEFT, TURN_RIGHT, DIRECTIONS)
 
 
 class Interpreter:
-    def __init__(self, program_input: str | None = None) -> None:
+    def __init__(self, program_input: str | None = None, build_in_input: Callable = None) -> None:
         """Initialize interpreter state.
 
         Args:
-            program_input: Optional external input string to use instead of standard input
+            program_input: Optional external input string to use instead of user input
+            build_in_input: Optional callable to use for input
         """
         self.program = None
         self.stack, self.addition_stack, self.output = [], [], []
         self.x, self.y = 0, 0
         self.direction = (0, 0)
         self.ignore_mode = False
-
-        if program_input:
-            self.built_in_input = False
-            self.input = program_input
-            self.input_pointer = 0
-        else:
-            self.built_in_input = True
+        self.input = program_input
+        self.input_pointer = 0
+        self.built_in_input = build_in_input
 
     def load_program(self, file: str) -> None:
         """Load program from file into GridMap.
@@ -65,7 +62,6 @@ class Interpreter:
                 return False
 
         return 0 < steps
-
 
     def get_current_char(self) -> str:
         """Retrieve the current character from the program grid at the interpreter's position.
@@ -117,6 +113,12 @@ class Interpreter:
             addition_stack_dump += f"[{item}]\n"
         return addition_stack_dump
 
+    def get_input(self) -> str:
+        if self.input:
+            return self.input
+        else:
+            return ""
+
     def get_information(self) -> dict[str, Any]:
         """Get current interpreter state information.
 
@@ -130,14 +132,26 @@ class Interpreter:
             "position": (self.x, self.y),
             "direction": self.direction,
             "character": self.get_current_char(),
-            "ignore_mode": self.ignore_mode
+            "ignore_mode": self.ignore_mode,
+            "input": self.input,
+            "input_pointer": self.input_pointer,
         }
 
     def reset(self) -> None:
         """Reset interpreter state to initial values."""
-        self.stack, self.addition_stack, self.output = [], [], []
+        self.stack, self.addition_stack, self.output, = [], [], []
+        self.ignore_mode, self.input_pointer, self.input = False, 0, ""
         self.x, self.y = 0, 0
         self.direction = (0, 0)
+
+    def set_input(self, input_data: str = "", pointer_position: int = 0) -> None:
+        """Set input for interpreter."""
+        self.input = input_data
+        self.input_pointer = pointer_position
+        if self.input:
+            self.built_in_input = False
+        else:
+            self.built_in_input = True
 
     def process_char(self, char: str) -> bool | IndexError:
         """Process a single character instruction from the DeoLang program.
@@ -171,7 +185,7 @@ class Interpreter:
 
         I: Push input character to stack
 
-        |, _: Do nothing (ignored)
+        |, _: Switch ignore mode.
 
         +, -, *, %: Pop top two stack elements, perform operation bottom over top, push result
 
@@ -180,6 +194,7 @@ class Interpreter:
         \: Pop top stack element, turn right if 0, left if non-zero
 
         Updates interpreter state (position, direction, stacks) accordingly.
+        If in ignore mode, ignore next character in the direction of the interpreter.
         """
         try:
             if char == "" or char is None:
@@ -223,17 +238,11 @@ class Interpreter:
             elif char == "C":
                 self.stack.append(self.stack[-1])
             elif char == "I":
-                raise NotImplementedError("Instruction I not tested")
-                # if self.built_in_input:
-                #     _input = input("Input: ")
-                #     if not _input:
-                #         raise ValueError("No input provided")
-                #     for input_char in _input:
-                #         self.stack.append(ord(input_char))
-                #     self.stack.append(0)
-                # else:
-                #     self.stack.append(ord(self.input[self.input_pointer]))
-                #     self.input_pointer += 1
+                if self.input == "":
+                    self.stack.append(self.built_in_input())
+                else:
+                    self.stack.append(ord(self.input[self.input_pointer]))
+                    self.input_pointer += 1
             elif char in "|_":
                 if char == "|" and self.direction in ((-1, 0), (1, 0)):
                     self.ignore_mode = True
