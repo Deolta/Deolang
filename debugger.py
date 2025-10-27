@@ -4,7 +4,7 @@ import sys
 import warnings
 from typing import Dict, Any
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QRect
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QGridLayout,
                              QLineEdit, QSpinBox, QHBoxLayout, QVBoxLayout,
@@ -73,6 +73,32 @@ class ColorDialog(QDialog):
             self.cursor_outline_color_input.text(),
             self.cursor_fill_color_input.text()
         )
+
+
+class InputDialog(QDialog):
+    def __init__(self, parent=None, title="Input", input_text=""):
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setModal(True)
+        self.resize(200, 1)
+        self.layout = QVBoxLayout()
+
+        self.layout.addWidget(QLabel("Input:"), alignment=Qt.AlignLeft)
+
+        self.input_box = QLineEdit()
+        self.input_box.setText(input_text)
+        self.layout.addWidget(self.input_box)
+
+        self.button_layout = QHBoxLayout()
+        self.ok_button = QPushButton("OK")
+        self.cancel_button = QPushButton("Cancel")
+        self.button_layout.addWidget(self.ok_button)
+        self.button_layout.addWidget(self.cancel_button)
+        self.layout.addLayout(self.button_layout)
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+
+        self.setLayout(self.layout)
 
 
 class CellGrid(QWidget):
@@ -177,7 +203,7 @@ class CellGrid(QWidget):
         self.current_col = col
         self.update_highlights(False)
 
-    def set_highlight_cell(self, row, col, ignore_mode):
+    def set_highlight_cell(self, row, col, ignore_mode=False):
         self.highlight_row = row
         self.highlight_col = col
         self.update_highlights(ignore_mode)
@@ -209,18 +235,23 @@ class CellGrid(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.color_change_action = None
+        self.color_dialog = None
+        self.input_dialog = None
         self.auto_run = None
         self.col_spin = None
         self.current_step = None
         self.debug_line1 = None
         self.debug_line2 = None
         self.debug_line3 = None
+        self.debug_line4 = None
+        self.debug_line5 = None
         self.export_action = None
         self.file_menu = None
         self.grid = None
         self.highlight_col = 0
         self.highlight_row = 0
-        self.interpreter = Interpreter()
+        self.interpreter = Interpreter(build_in_input=self.open_input_dialog)
         self.is_running = False
         self.menu_bar = None
         self.open_action = None
@@ -265,8 +296,16 @@ class MainWindow(QMainWindow):
         self.color_change_action.triggered.connect(self.open_input_color_dialog)
         self.menu_bar.addAction(self.color_change_action)
 
+        self.input_change_action = QAction("&Input", self)
+        self.input_change_action.triggered.connect(self.open_input_dialog)
+        self.menu_bar.addAction(self.input_change_action)
+
         self.grid = CellGrid(25, 25)
-        main_layout.addWidget(self.grid, 3)
+        self.grid_layout = QVBoxLayout()
+        self.grid_layout.addWidget(self.grid)
+        self.grid_layout.setAlignment(Qt.AlignTop)
+        self.grid_layout.addStretch(0)
+        main_layout.addLayout(self.grid_layout)
 
         control_panel = QVBoxLayout()
 
@@ -320,6 +359,7 @@ class MainWindow(QMainWindow):
         self.debug_line2 = QLabel("Cords: ")
         self.debug_line3 = QLabel("Direction: ")
         self.debug_line4 = QLabel("Ignore_mode: ")
+        self.debug_line5 = QLabel("input: ")
 
         first_row = QHBoxLayout()
         first_row.addWidget(self.run_button)
@@ -367,29 +407,35 @@ class MainWindow(QMainWindow):
         stack2_layout = QHBoxLayout()
         stack2_layout.addWidget(self.stack1)
         stack2_layout.addWidget(self.stack2)
-
+        stack2_layout.addStretch(1)
         debug_layout = QVBoxLayout()
         debug_layout.addWidget(self.debug_line1)
         debug_layout.addWidget(self.debug_line2)
         debug_layout.addWidget(self.debug_line3)
         debug_layout.addWidget(self.debug_line4)
+        debug_layout.addWidget(self.debug_line5)
+        debug_layout.addStretch(0)
 
         stack_layout = QVBoxLayout()
         stack_layout.addLayout(label_layout)
         stack_layout.addLayout(stack2_layout)
 
         side_panel_a = QGroupBox("Debug:")
-        side_panel = QVBoxLayout()
+        side_panel = QHBoxLayout()
         side_panel.addLayout(stack_layout)
         side_panel.addLayout(debug_layout)
         side_panel_a.setLayout(side_panel)
 
         control_panel.addLayout(debug_layout)
         control_panel.addWidget(side_panel_a)
-        main_layout.addLayout(control_panel, 1)
+
+        main_layout.addStretch(1)
+        main_layout.addLayout(control_panel)
+        control_panel.setAlignment(Qt.AlignRight)
 
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
+        self.reset()
 
     def run(self):
         self.auto_run = True
@@ -443,6 +489,17 @@ class MainWindow(QMainWindow):
                 self.stack2.addItem(str(item))
 
         self.debug_line4.setText(f"Ignore_mode: {information['ignore_mode']}")
+        text = f"Input: {information['input']}"
+        self.debug_line5.setText(text)
+        symbol_index = information["input_pointer"] + 7
+        if symbol_index < len(text):
+            highlighted_text = (
+                    text[:symbol_index] +
+                    f"<span style='background-color: {self.grid.cursor_fill_color}; color: black;'>{text[symbol_index]}</span>" +
+                    text[symbol_index + 1:]
+            )
+            self.debug_line5.setText(highlighted_text)
+            self.debug_line5.setTextFormat(Qt.RichText)
 
         if information["output"]:
             self.debug_line1.setText(f"Output: {information['output']}")
@@ -491,12 +548,18 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "export error", f"Error exporting file: {e}")
 
     def open_input_color_dialog(self):
-        dialog = ColorDialog(self, (
-        self.grid.pointer_outline_color, self.grid.pointer_fill_color, self.grid.cursor_outline_color,
-        self.grid.cursor_fill_color))
-        if dialog.exec_() == QDialog.Accepted:
-            new_values = dialog.get_values()
+        self.color_dialog = ColorDialog(self, (
+            self.grid.pointer_outline_color, self.grid.pointer_fill_color, self.grid.cursor_outline_color,
+            self.grid.cursor_fill_color))
+        if self.color_dialog.exec_() == QDialog.Accepted:
+            new_values = self.color_dialog.get_values()
             self.update_colors(new_values)
+
+    def open_input_dialog(self):
+        self.input_dialog = InputDialog(self, "Input", self.interpreter.get_input())
+        if self.input_dialog.exec_() == QDialog.Accepted:
+            self.interpreter.set_input(self.input_dialog.input_box.text())
+        self.edit_info()
 
     def update_colors(self, new_values):
         self.grid.pointer_outline_color = new_values[0]
